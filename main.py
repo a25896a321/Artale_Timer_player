@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Artale Timer Player  v1.0.1
+Artale Timer Player  v1.0.2
 Author  : oo_jump
-Window  : Artale Timer Player_v1.0.1
-
-Run as Administrator to enable global hotkeys.
+Title   : Artale Timer Player_v1.0.2
 """
 
 import tkinter as tk
@@ -29,18 +27,18 @@ from calculator import (
     BUTTON_NAMES,
     compute_tagged_results,
     compute_plain_results,
-    compute_best5zones,
     minutes_to_str,
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# App metadata & paths
+# App metadata
 # ══════════════════════════════════════════════════════════════════════════════
 
-VERSION    = "1.0.1"
-APP_NAME   = f"Artale Timer Player_v{VERSION}"
-AUTHOR     = "oo_jump"
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+VERSION  = "1.0.2"
+APP_NAME = f"Artale Timer Player_v{VERSION}"
+AUTHOR   = "oo_jump"
+
+SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_FILE = os.path.join(SCRIPT_DIR, "settings.json")
 PNG_DIR       = os.path.join(SCRIPT_DIR, "png_type")
 ICON_PATH     = os.path.join(PNG_DIR, "Artale_timer_player_ico.ico")
@@ -71,7 +69,7 @@ FONT_HINT   = (FONT_FAMILY, 8)
 FONT_BTN    = (FONT_FAMILY, 9, "bold")
 FONT_TIME   = (FONT_FAMILY, 11, "bold")
 
-# ── VK code tables ─────────────────────────────────────────────────────────
+# ── VK tables ──────────────────────────────────────────────────────────────
 VK_CODE_MAP: dict = {
     'NumPad0': 0x60, 'NumPad1': 0x61, 'NumPad2': 0x62, 'NumPad3': 0x63,
     'NumPad4': 0x64, 'NumPad5': 0x65, 'NumPad6': 0x66, 'NumPad7': 0x67,
@@ -91,7 +89,6 @@ KEYSYM_VK: dict = {
     **{f'F{n}': 0x6F + n for n in range(1, 13)},
 }
 
-# ── Time button definitions ────────────────────────────────────────────────
 TIME_BUTTONS = [
     ('btn_10min', '10分'), ('btn_30min', '30分'),
     ('btn_50min', '50分'), ('btn_1hr',   '1hr'),
@@ -104,9 +101,9 @@ SORT_ORDERS = ['base_desc', 'base_asc', 'result_desc', 'result_asc', 'best5zones
 # ── Default settings ────────────────────────────────────────────────────────
 DEFAULT_SETTINGS: dict = {
     "language": "zh",
-    "topmost": False,
+    "topmost":  False,
     "sort_order": "base_desc",
-    "opacity": 1.0,
+    "opacity":  1.0,
     "hotkeys": {
         "10分": {"vk": 0x61, "name": "NumPad1"},
         "30分": {"vk": 0x63, "name": "NumPad3"},
@@ -120,26 +117,32 @@ DEFAULT_SETTINGS: dict = {
         "undo": {"vk": 0x6D, "name": "NumPad-"},
     },
     "interface": {
-        # Preview
-        "preview_fg":       "#ffd040",
-        "preview_bg_on":    True,
-        "preview_bg":       "#141428",
-        # Float window
-        "float_bg_on":      True,
-        "float_bg":         "#0f0f1a",
-        "float_x":          100,
-        "float_y":          100,
-        "float_opacity":    0.92,
-        "show_float_sel":   True,       # show time buttons in float
-        "float_font_size":  8,
-        "float_fg":         "#7de88a",
-        # Buttons (synced to float)
-        "btn_color":        "#5bb8f5",
-        "btn_bg_on":        True,
-        "show_hotkeys":     True,
-        "btn_icon_size":    36,
-        "btn_spacing":      2,
-        # Results display
+        # ── Main window — preview ──
+        "preview_fg":           "#ffd040",
+        "preview_bg_on":        True,
+        "preview_bg":           "#141428",
+        # ── Main window — buttons ──
+        "btn_color":            "#5bb8f5",
+        "btn_bg_on":            True,
+        "show_hotkeys":         True,
+        "btn_icon_size":        36,
+        "btn_spacing":          2,
+        # ── Float window — appearance ──
+        "float_bg_on":          True,
+        "float_bg":             "#0f0f1a",
+        "float_x":              100,
+        "float_y":              100,
+        "float_width":          240,
+        "float_height":         390,
+        "float_opacity":        0.92,
+        "show_float_sel":       True,
+        "float_font_size":      8,
+        "float_fg":             "#7de88a",
+        "float_results_mode":   "expand",   # "expand" | "scroll"
+        # ── Float window — buttons (separate from main) ──
+        "float_btn_color":      "#5bb8f5",
+        "float_btn_bg_on":      True,
+        # ── Results display ──
         "results_font_size":    9,
         "results_fg":           "#7de88a",
         "results_show_number":  True,
@@ -149,7 +152,7 @@ DEFAULT_SETTINGS: dict = {
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Utilities
+# Win32 helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
 def is_admin() -> bool:
@@ -159,10 +162,6 @@ def is_admin() -> bool:
         return False
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Win32 global hotkey listener
-# ══════════════════════════════════════════════════════════════════════════════
-
 class Win32HotkeyListener:
     WM_HOTKEY = 0x0312
     WM_QUIT   = 0x0012
@@ -170,8 +169,8 @@ class Win32HotkeyListener:
     def __init__(self, id_to_action: dict, callback):
         self._id_to_action = id_to_action
         self._callback     = callback
-        self._thread: threading.Thread | None = None
-        self._win32_tid: int = 0
+        self._thread       = None
+        self._win32_tid    = 0
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -198,13 +197,7 @@ class Win32HotkeyListener:
 
 
 def build_hotkey_listener(hotkeys_cfg: dict, callback):
-    actions = {
-        "10分": hotkeys_cfg["10分"]["vk"], "30分": hotkeys_cfg["30分"]["vk"],
-        "50分": hotkeys_cfg["50分"]["vk"], "1hr":  hotkeys_cfg["1hr"]["vk"],
-        "2hr":  hotkeys_cfg["2hr"]["vk"],  "4hr":  hotkeys_cfg["4hr"]["vk"],
-        "9hr":  hotkeys_cfg["9hr"]["vk"],  "x2":   hotkeys_cfg["x2"]["vk"],
-        "clear":hotkeys_cfg["clear"]["vk"],"undo": hotkeys_cfg["undo"]["vk"],
-    }
+    actions = {k: hotkeys_cfg[k]["vk"] for k in hotkeys_cfg}
     id_to_action = {}
     for i, (action, vk) in enumerate(actions.items(), start=1):
         if ctypes.windll.user32.RegisterHotKey(None, i, 0, vk):
@@ -225,25 +218,24 @@ def build_hotkey_listener(hotkeys_cfg: dict, callback):
 class ArtaleTimerPlayer:
 
     def __init__(self):
-        # State
         self.selected: list[str] = []
         self.settings: dict = self._load_settings()
-        self.lang: str     = self.settings["language"]
-        self.is_topmost: bool = self.settings["topmost"]
-        self._admin: bool  = is_admin()
-        self._hk_listener  = None
+        self.lang:      str  = self.settings["language"]
+        self.is_topmost:bool = self.settings["topmost"]
+        self._admin:    bool = is_admin()
+        self._hk_listener    = None
 
-        # Sub-window slots (single-instance)
         self._hotkey_win = None
         self._iface_win  = None
         self._float_win  = None
 
-        # Float drag
+        # Float drag & resize state
         self._float_drag_x = self._float_drag_y = 0
+        self._float_rsz_x  = self._float_rsz_y  = 0
+        self._float_rsz_w  = self._float_rsz_h  = 0
         self._img_move: object = None
         self._img_gear: object = None
 
-        # Build
         self.root = tk.Tk()
         self._setup_root()
         self._build_ui()
@@ -291,17 +283,15 @@ class ArtaleTimerPlayer:
     def _setup_root(self):
         self.root.title(APP_NAME)
         self.root.configure(bg=BG_MAIN)
-        self.root.resizable(False, False)
-        w, h = 490, 630
+        # ① Resizable main window (request #6)
+        self.root.resizable(True, True)
+        self.root.minsize(540, 580)
+        w, h = 540, 630
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
         self.root.attributes('-topmost', self.is_topmost)
         self.root.attributes('-alpha', self.settings.get("opacity", 1.0))
-        if os.path.exists(ICON_PATH):
-            try:
-                self.root.iconbitmap(ICON_PATH)
-            except Exception:
-                pass
+        self._set_icon(self.root)
 
     # ══════════════════════════════════════════════════════════════════════
     # UI builders
@@ -321,10 +311,12 @@ class ArtaleTimerPlayer:
         self.hint_frame = tk.Frame(self.root, bg=BG_FRAME, height=26)
         self.hint_frame.pack(fill=tk.X)
         self.hint_frame.pack_propagate(False)
+
         self.hint_label = tk.Label(
             self.hint_frame, text='', bg=BG_FRAME, fg=FG_HINT,
             font=FONT_HINT, anchor='w', padx=8)
         self.hint_label.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
         self.topmost_indicator = tk.Label(
             self.hint_frame, text='', bg=BG_FRAME, fg=FG_ACCENT,
             font=FONT_HINT, padx=8)
@@ -333,13 +325,13 @@ class ArtaleTimerPlayer:
     def _update_hint(self, status: str = 'ready'):
         top_txt = self.t('hint_topmost_on') if self.is_topmost else self.t('hint_topmost_off')
         self.topmost_indicator.config(
-            text=top_txt, fg=FG_ACCENT if self.is_topmost else FG_MUTED)
-        key = {
-            'ready':      'hint_ready',
-            'selecting':  'hint_selecting',
-            'calculated': 'hint_calculated',
-            'settings':   'hint_settings_open',
-        }.get(status, 'hint_ready')
+            text=top_txt,
+            fg=FG_ACCENT if self.is_topmost else FG_MUTED)
+        key = {'ready':     'hint_ready',
+               'selecting': 'hint_selecting',
+               'calculated':'hint_calculated',
+               'settings':  'hint_settings_open',
+               }.get(status, 'hint_ready')
         self.hint_label.config(text=self.t(key))
 
     # ── top_frame ─────────────────────────────────────────────────────────
@@ -357,15 +349,16 @@ class ArtaleTimerPlayer:
             b.pack(side=tk.LEFT, padx=2)
             return b
 
-        self.topmost_btn  = _btn(self.t('btn_topmost_on'), self._toggle_topmost, w=7,
-                                 fg=FG_ACCENT if self.is_topmost else FG_TEXT)
-        self.hotkeys_btn  = _btn(self.t('btn_hotkeys'),   self._open_hotkey_settings, w=8)
-        self.iface_btn    = _btn(self.t('btn_interface'),  self._open_interface_settings, w=9)
-        self.sponsor_btn  = _btn(self.t('btn_sponsor'),   self._open_sponsor, w=7)
-        self.lang_btn     = _btn(self.t('btn_lang'),      self._toggle_lang, w=5, fg=FG_ACCENT)
-        self.float_btn    = _btn(self.t('btn_float'),     self._toggle_float, w=6)
+        self.topmost_btn = _btn(
+            self.t('btn_topmost_on'), self._toggle_topmost, w=7,
+            fg=FG_ACCENT if self.is_topmost else FG_TEXT)
+        self.hotkeys_btn = _btn(self.t('btn_hotkeys'),   self._open_hotkey_settings, w=8)
+        self.iface_btn   = _btn(self.t('btn_interface'), self._open_interface_settings, w=9)
+        self.sponsor_btn = _btn(self.t('btn_sponsor'),   self._open_sponsor, w=7)
+        self.lang_btn    = _btn(self.t('btn_lang'),      self._toggle_lang, w=5, fg=FG_ACCENT)
+        self.float_btn   = _btn(self.t('btn_float'),     self._toggle_float, w=6)
 
-    # ── Time buttons (4 cols × 2 rows) ───────────────────────────────────
+    # ── Time buttons (4 × 2) ─────────────────────────────────────────────
 
     def _build_time_buttons_frame(self):
         if hasattr(self, '_time_btn_outer') and self._time_btn_outer.winfo_exists():
@@ -376,22 +369,21 @@ class ArtaleTimerPlayer:
         self._time_btn_outer = outer
         self.time_btn_widgets: dict[str, tk.Button] = {}
 
-        iface   = self.settings["interface"]
-        gap     = iface["btn_spacing"]
-        btn_fg  = iface["btn_color"]
-        btn_bg  = BG_BTN if iface["btn_bg_on"] else BG_MAIN
+        iface  = self.settings["interface"]
+        gap    = iface["btn_spacing"]
+        btn_fg = iface["btn_color"]
+        btn_bg = BG_BTN if iface["btn_bg_on"] else BG_MAIN
 
         for idx, (label_key, name) in enumerate(TIME_BUTTONS):
-            col = idx % 4
-            row = idx // 4
-            text = self._time_btn_label(label_key, name)
             b = tk.Button(
-                outer, text=text, width=7, height=2,
+                outer, text=self._time_btn_label(label_key, name),
+                width=7, height=2,
                 bg=btn_bg, fg=btn_fg,
                 activebackground=BG_BTN_HV, activeforeground=FG_TEXT,
                 relief=tk.FLAT, font=FONT_BTN, cursor='hand2',
                 command=lambda n=name: self._on_time_btn(n))
-            b.grid(row=row, column=col, padx=gap, pady=gap, sticky='nsew')
+            b.grid(row=idx // 4, column=idx % 4,
+                   padx=gap, pady=gap, sticky='nsew')
             self.time_btn_widgets[name] = b
 
         for c in range(4):
@@ -399,12 +391,23 @@ class ArtaleTimerPlayer:
 
     def _time_btn_label(self, label_key: str, name: str) -> str:
         text = self.t(label_key)
-        iface = self.settings["interface"]
-        if iface.get("show_hotkeys", True):
+        if self.settings["interface"].get("show_hotkeys", True):
             hk = self.settings["hotkeys"].get(name, {}).get("name", "")
             if hk:
                 text += f"\n[{hk}]"
         return text
+
+    # ⑦ Update button styles IN-PLACE — no rebuild
+    def _update_time_btn_styles(self):
+        iface  = self.settings["interface"]
+        btn_fg = iface.get("btn_color", "#5bb8f5")
+        btn_bg = BG_BTN if iface.get("btn_bg_on", True) else BG_MAIN
+        for (label_key, name) in TIME_BUTTONS:
+            btn = self.time_btn_widgets.get(name)
+            if btn and btn.winfo_exists():
+                btn.config(
+                    text=self._time_btn_label(label_key, name),
+                    fg=btn_fg, bg=btn_bg)
 
     # ── Preview frame ─────────────────────────────────────────────────────
 
@@ -416,10 +419,9 @@ class ArtaleTimerPlayer:
             highlightbackground=BORDER, highlightthickness=1)
         self.preview_lf.pack(fill=tk.X, padx=6, pady=(4, 2))
 
-        iface    = self.settings["interface"]
-        slot_bg  = iface["preview_bg"] if iface["preview_bg_on"] else BG_PREVIEW
-        slot_fg  = iface["preview_fg"]
-
+        iface   = self.settings["interface"]
+        slot_bg = iface["preview_bg"] if iface["preview_bg_on"] else BG_PREVIEW
+        slot_fg = iface["preview_fg"]
         self.preview_slots: list[tk.Button] = []
         for i in range(4):
             slot = tk.Button(
@@ -451,7 +453,6 @@ class ArtaleTimerPlayer:
         rf = tk.Frame(self.root, bg=BG_MAIN)
         rf.pack(fill=tk.BOTH, expand=True, padx=6, pady=(2, 2))
 
-        # Header row
         header = tk.Frame(rf, bg=BG_MAIN)
         header.pack(fill=tk.X)
 
@@ -461,17 +462,15 @@ class ArtaleTimerPlayer:
         self.results_title_lbl.pack(side=tk.LEFT, padx=4)
 
         self._sort_labels = [self.t(f'sort_{o}') for o in SORT_ORDERS]
-        self.sort_var = tk.StringVar(value=self._sort_labels[
-            SORT_ORDERS.index(self.settings["sort_order"])])
-
-        self.sort_combo = ttk.Combobox(
+        self.sort_var     = tk.StringVar(
+            value=self._sort_labels[SORT_ORDERS.index(self.settings["sort_order"])])
+        self.sort_combo   = ttk.Combobox(
             header, textvariable=self.sort_var,
             values=self._sort_labels, state='readonly',
             width=22, font=FONT_HINT)
         self.sort_combo.pack(side=tk.RIGHT, padx=4)
         self.sort_combo.bind('<<ComboboxSelected>>', self._on_sort_change)
 
-        # Text + scrollbar
         txt_frame = tk.Frame(
             rf, bg=BG_RESULTS,
             highlightbackground=BORDER, highlightthickness=1)
@@ -481,13 +480,11 @@ class ArtaleTimerPlayer:
         sb.pack(side=tk.RIGHT, fill=tk.Y)
 
         iface = self.settings["interface"]
-        res_font_size = iface.get("results_font_size", 9)
-        res_fg        = iface.get("results_fg", FG_RESULT)
-
         self.results_text = tk.Text(
             txt_frame,
-            bg=BG_RESULTS, fg=res_fg,
-            font=("Consolas", res_font_size),
+            bg=BG_RESULTS,
+            fg=iface.get("results_fg", FG_RESULT),
+            font=("Consolas", iface.get("results_font_size", 9)),
             relief=tk.FLAT, bd=0,
             state=tk.DISABLED, wrap=tk.NONE,
             yscrollcommand=sb.set,
@@ -495,21 +492,22 @@ class ArtaleTimerPlayer:
             padx=8, pady=6)
         self.results_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sb.config(command=self.results_text.yview)
-
-        self._configure_result_tags(res_fg)
+        self._configure_result_tags()
         self._update_results()
 
-    def _configure_result_tags(self, res_fg: str = FG_RESULT):
-        iface = self.settings["interface"]
-        float_fg = iface.get("float_fg", FG_RESULT)
-        self.results_text.tag_configure('header',      foreground=FG_RESULT_H,
-                                        font=("Consolas", iface.get("results_font_size", 9), "bold"))
-        self.results_text.tag_configure('col_num',     foreground=FG_HINT)
-        self.results_text.tag_configure('col_range',   foreground=FG_TEXT)
-        self.results_text.tag_configure('col_action',  foreground=FG_WHITE)
-        self.results_text.tag_configure('col_estimate',foreground=res_fg)
-        self.results_text.tag_configure('muted',       foreground=FG_MUTED)
-        self.results_text.tag_configure('newline',     foreground=res_fg)
+    def _configure_result_tags(self):
+        iface   = self.settings["interface"]
+        res_fg  = iface.get("results_fg", FG_RESULT)
+        res_sz  = iface.get("results_font_size", 9)
+        self.results_text.tag_configure('header',
+            foreground=FG_RESULT_H,
+            font=("Consolas", res_sz, "bold"))
+        self.results_text.tag_configure('col_num',      foreground=FG_HINT)
+        self.results_text.tag_configure('col_range',    foreground=FG_TEXT)
+        self.results_text.tag_configure('col_action',   foreground=FG_WHITE)
+        self.results_text.tag_configure('col_estimate', foreground=res_fg)
+        self.results_text.tag_configure('muted',        foreground=FG_MUTED)
+        self.results_text.tag_configure('newline',      foreground=res_fg)
 
     def _update_results(self):
         txt = self.results_text
@@ -523,15 +521,14 @@ class ArtaleTimerPlayer:
         if not self.selected:
             txt.insert(tk.END, self.t('results_empty') + '\n', 'muted')
         else:
-            order  = self.settings["sort_order"]
             tagged = compute_tagged_results(
-                self.selected, order, self.lang, show_number, show_estimate)
+                self.selected, self.settings["sort_order"],
+                self.lang, show_number, show_estimate)
             for text_part, tag in tagged:
                 txt.insert(tk.END, text_part, tag)
 
         txt.config(state=tk.DISABLED)
 
-        # Mirror to float
         if self._float_win and self._float_win.winfo_exists():
             self._float_update_results()
 
@@ -547,13 +544,13 @@ class ArtaleTimerPlayer:
         self.opacity_lbl.pack(side=tk.LEFT, padx=4)
 
         self.opacity_var = tk.DoubleVar(value=self.settings.get("opacity", 1.0))
-        scale = tk.Scale(
+        tk.Scale(
             of, from_=0.2, to=1.0, resolution=0.05,
             orient=tk.HORIZONTAL, variable=self.opacity_var,
             bg=BG_MAIN, fg=FG_TEXT, troughcolor=BG_BTN,
-            highlightthickness=0, showvalue=False, length=260,
-            command=self._on_opacity_change)
-        scale.pack(side=tk.LEFT, padx=4)
+            highlightthickness=0, showvalue=False, length=280,
+            command=self._on_opacity_change
+        ).pack(side=tk.LEFT, padx=4)
 
         self.opacity_pct = tk.Label(
             of, text=f"{int(self.opacity_var.get()*100)}%",
@@ -565,13 +562,11 @@ class ArtaleTimerPlayer:
     # ══════════════════════════════════════════════════════════════════════
 
     def _on_time_btn(self, name: str):
-        """Add a button to selection (no hard cap at 4 for display, but max 4)."""
         if len(self.selected) < 4:
             self.selected.append(name)
         self._after_selection_change()
 
     def _on_preview_click(self, idx: int):
-        """Remove the item at position idx from selection."""
         if idx < len(self.selected):
             self.selected.pop(idx)
             self._after_selection_change()
@@ -596,7 +591,6 @@ class ArtaleTimerPlayer:
         self._update_results()
         if self._float_win and self._float_win.winfo_exists():
             self._float_update_preview()
-            self._float_update_results()
 
     def _on_sort_change(self, event=None):
         try:
@@ -616,8 +610,8 @@ class ArtaleTimerPlayer:
         self.is_topmost = not self.is_topmost
         self.settings["topmost"] = self.is_topmost
         self.root.attributes('-topmost', self.is_topmost)
-        fg = FG_ACCENT if self.is_topmost else FG_TEXT
-        self.topmost_btn.config(fg=fg)
+        self.topmost_btn.config(
+            fg=FG_ACCENT if self.is_topmost else FG_TEXT)
         self._update_hint()
         self._save_settings()
 
@@ -630,34 +624,23 @@ class ArtaleTimerPlayer:
         self._refresh_all_text()
 
     def _refresh_all_text(self):
-        """Update every UI label/button to the current language instantly."""
         self.root.title(APP_NAME)
         self._update_hint()
-
-        # top_frame
         self.topmost_btn.config(text=self.t('btn_topmost_on'))
         self.hotkeys_btn.config(text=self.t('btn_hotkeys'))
         self.iface_btn.config(text=self.t('btn_interface'))
         self.sponsor_btn.config(text=self.t('btn_sponsor'))
         self.lang_btn.config(text=self.t('btn_lang'))
         self.float_btn.config(text=self.t('btn_float'))
-
-        # preview_frame
         self.preview_lf.config(text=self.t('preview_title'))
         self._update_preview()
-
-        # results
         self.results_title_lbl.config(text=self.t('results_title'))
         self._sort_labels = [self.t(f'sort_{o}') for o in SORT_ORDERS]
-        cur_order = self.settings["sort_order"]
         self.sort_combo.config(values=self._sort_labels)
-        self.sort_var.set(self._sort_labels[SORT_ORDERS.index(cur_order)])
+        self.sort_var.set(
+            self._sort_labels[SORT_ORDERS.index(self.settings["sort_order"])])
         self._update_results()
-
-        # opacity
         self.opacity_lbl.config(text=self.t('opacity_label'))
-
-        # time buttons
         for (label_key, name) in TIME_BUTTONS:
             if name in self.time_btn_widgets:
                 self.time_btn_widgets[name].config(
@@ -735,13 +718,12 @@ class ArtaleTimerPlayer:
         tk.Label(fr, text=self.t('hotkey_col_key'), bg=BG_MAIN, fg=FG_ACCENT,
                  font=FONT_BTN, width=16).grid(row=0, column=1, padx=4, pady=2)
 
-        key_vars: dict[str, tk.StringVar] = {}
-        key_btns: dict[str, tk.Button]   = {}
+        key_vars: dict = {}
+        key_btns: dict = {}
         capturing = {'active': None}
 
         def start_capture(action):
-            if capturing['active']:
-                return
+            if capturing['active']: return
             capturing['active'] = action
             key_btns[action].config(text=self.t('hotkey_listening'),
                                     fg=FG_ACCENT, bg=BG_BTN_ACT)
@@ -750,8 +732,7 @@ class ArtaleTimerPlayer:
 
         def on_keypress(event):
             action = capturing['active']
-            if not action:
-                return
+            if not action: return
             vk   = KEYSYM_VK.get(event.keysym, event.keycode)
             name = VK_NAME_MAP.get(vk, event.keysym)
             key_vars[action].set(name)
@@ -778,33 +759,30 @@ class ArtaleTimerPlayer:
         def save_hotkeys():
             for action, var in key_vars.items():
                 name = var.get()
-                vk   = VK_CODE_MAP.get(name, 0)
-                self.settings["hotkeys"][action] = {"vk": vk, "name": name}
+                self.settings["hotkeys"][action] = {
+                    "vk": VK_CODE_MAP.get(name, 0), "name": name}
             self._save_settings()
             self._stop_global_hotkeys()
-            if self._admin:
-                self._start_global_hotkeys()
-            else:
-                self._bind_local_hotkeys()
+            if self._admin: self._start_global_hotkeys()
+            else:           self._bind_local_hotkeys()
             messagebox.showinfo(self.t('hotkey_title'),
                                 self.t('hotkey_saved_msg'), parent=win)
 
         def reset_hotkeys():
             for action, var in key_vars.items():
                 dflt = DEFAULT_SETTINGS["hotkeys"][action]["name"]
-                var.set(dflt)
-                key_btns[action].config(text=dflt)
+                var.set(dflt); key_btns[action].config(text=dflt)
 
-        self._bot_buttons(bot,
+        self._bot_btns(bot,
             (self.t('hotkey_save'),  save_hotkeys,  FG_ACCENT, '#000'),
             (self.t('hotkey_reset'), reset_hotkeys, BG_BTN, FG_TEXT),
-            (self.t('hotkey_close'), lambda: self._close_sub(win, '_hotkey_win'),
-             BG_BTN, FG_TEXT),
+            (self.t('hotkey_close'),
+             lambda: self._close_sub(win, '_hotkey_win'), BG_BTN, FG_TEXT),
         )
-        self._center_window(win)
+        self._center_win(win)
 
     # ══════════════════════════════════════════════════════════════════════
-    # Interface settings window
+    # Interface settings window  (3 tabs: Main / Float / Results)
     # ══════════════════════════════════════════════════════════════════════
 
     def _open_interface_settings(self):
@@ -827,128 +805,170 @@ class ArtaleTimerPlayer:
         iface = self.settings["interface"]
         tmp: dict = copy.deepcopy(iface)
 
-        # ── helper builders ───────────────────────────────────────────
-        def _fr(parent):
-            f = tk.Frame(parent, bg=BG_MAIN, padx=12, pady=8)
-            f.pack(fill=tk.BOTH, expand=True)
-            return f
+        # ── widget builders ────────────────────────────────────────────
 
-        def _lbl(parent, row, text_key, col=0, **kw):
+        def _scf(parent):
+            """Scrollable canvas frame."""
+            canvas = tk.Canvas(parent, bg=BG_MAIN, bd=0,
+                               highlightthickness=0, width=340)
+            vsb = tk.Scrollbar(parent, orient=tk.VERTICAL,
+                               command=canvas.yview)
+            canvas.configure(yscrollcommand=vsb.set)
+            vsb.pack(side=tk.RIGHT, fill=tk.Y)
+            canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            inner = tk.Frame(canvas, bg=BG_MAIN)
+            win_id = canvas.create_window((0, 0), window=inner, anchor='nw')
+            def on_conf(e):
+                canvas.configure(scrollregion=canvas.bbox('all'))
+                canvas.itemconfigure(win_id, width=canvas.winfo_width())
+            inner.bind('<Configure>', on_conf)
+            canvas.bind('<MouseWheel>',
+                        lambda e: canvas.yview_scroll(-1*(e.delta//120), 'units'))
+            return inner
+
+        def _sep(parent, row, text_key):
+            lbl = tk.Label(parent, text=self.t(text_key),
+                           bg=BG_MAIN, fg=FG_ACCENT, font=FONT_HINT, anchor='w')
+            lbl.grid(row=row, column=0, columnspan=2,
+                     sticky='w', padx=4, pady=(10, 2))
+
+        def _lbl(parent, row, text_key):
             tk.Label(parent, text=self.t(text_key),
                      bg=BG_MAIN, fg=FG_TEXT, font=FONT_MAIN,
-                     anchor='w', width=22, **kw
-                     ).grid(row=row, column=col, sticky='w', padx=4, pady=4)
+                     anchor='w', width=22
+                     ).grid(row=row, column=0, sticky='w', padx=4, pady=3)
 
+        # ② Fixed color row — correct parent hierarchy
         def _color_row(parent, row, label_key, cfg_key):
             _lbl(parent, row, label_key)
-            v = tk.StringVar(value=tmp.get(cfg_key, '#ffffff'))
-            swatch = tk.Frame(parent, bg=tmp.get(cfg_key, '#ffffff'),
+            frame = tk.Frame(parent, bg=BG_MAIN)
+            frame.grid(row=row, column=1, sticky='w', padx=4, pady=3)
+            # swatch uses frame as parent
+            swatch = tk.Frame(frame, bg=tmp.get(cfg_key, '#ffffff'),
                               width=28, height=16, relief=tk.SOLID, bd=1)
-            def pick(k=cfg_key, sv=v, sw=swatch):
-                col = colorchooser.askcolor(color=sv.get(), parent=win)[1]
+            swatch.pack_propagate(False)
+            swatch.pack(side=tk.LEFT, padx=(0, 4))
+            def pick(k=cfg_key, sw=swatch):
+                col = colorchooser.askcolor(
+                    color=tmp.get(k, '#ffffff'), parent=win)[1]
                 if col:
-                    sv.set(col)
                     tmp[k] = col
                     sw.config(bg=col)
-            btn = tk.Button(parent, text=self.t('ui_choose_color'),
-                            command=pick, bg=BG_BTN, fg=FG_TEXT,
-                            relief=tk.FLAT, font=FONT_HINT, cursor='hand2', padx=6)
-            frame = tk.Frame(parent, bg=BG_MAIN)
-            frame.grid(row=row, column=1, sticky='w', padx=4, pady=4)
-            swatch.pack(in_=frame, side=tk.LEFT, padx=(0, 4))
-            btn.pack(in_=frame, side=tk.LEFT)
+            tk.Button(frame, text=self.t('ui_choose_color'),
+                      command=pick, bg=BG_BTN, fg=FG_TEXT,
+                      relief=tk.FLAT, font=FONT_HINT, cursor='hand2', padx=6
+                      ).pack(side=tk.LEFT)
 
         def _check_row(parent, row, label_key, cfg_key, default=True):
             _lbl(parent, row, label_key)
             v = tk.BooleanVar(value=tmp.get(cfg_key, default))
-            cb = tk.Checkbutton(parent, variable=v, bg=BG_MAIN, fg=FG_TEXT,
-                                activebackground=BG_MAIN, selectcolor=BG_BTN,
-                                font=FONT_MAIN,
-                                command=lambda k=cfg_key, vv=v: tmp.update({k: vv.get()}))
-            cb.grid(row=row, column=1, sticky='w', padx=4, pady=4)
+            tk.Checkbutton(parent, variable=v, bg=BG_MAIN, fg=FG_TEXT,
+                           activebackground=BG_MAIN, selectcolor=BG_BTN,
+                           font=FONT_MAIN,
+                           command=lambda k=cfg_key, vv=v: tmp.update({k: vv.get()})
+                           ).grid(row=row, column=1, sticky='w', padx=4, pady=3)
 
-        def _spin_row(parent, row, label_key, cfg_key, from_, to_):
+        def _spin_row(parent, row, label_key, cfg_key, lo, hi):
             _lbl(parent, row, label_key)
-            v = tk.StringVar(value=str(tmp.get(cfg_key, from_)))
-            def update(k=cfg_key, sv=v):
+            v = tk.StringVar(value=str(tmp.get(cfg_key, lo)))
+            def upd(k=cfg_key, sv=v):
                 try: tmp[k] = int(sv.get())
                 except ValueError: pass
-            sb = tk.Spinbox(parent, from_=from_, to=to_, textvariable=v,
+            sb = tk.Spinbox(parent, from_=lo, to=hi, textvariable=v,
                             width=6, bg=BG_ENTRY, fg=FG_TEXT,
-                            buttonbackground=BG_BTN, relief=tk.FLAT, font=FONT_MAIN,
-                            command=update)
-            sb.bind('<FocusOut>', lambda e: update())
-            sb.grid(row=row, column=1, sticky='w', padx=4, pady=4)
+                            buttonbackground=BG_BTN, relief=tk.FLAT,
+                            font=FONT_MAIN, command=upd)
+            sb.bind('<FocusOut>', lambda e: upd())
+            sb.grid(row=row, column=1, sticky='w', padx=4, pady=3)
 
-        def _opacity_row(parent, row, label_key, cfg_key):
+        def _scale_row(parent, row, label_key, cfg_key):
             _lbl(parent, row, label_key)
             ov = tk.DoubleVar(value=tmp.get(cfg_key, 0.9))
-            sc = tk.Scale(parent, from_=0.2, to=1.0, resolution=0.05,
-                          orient=tk.HORIZONTAL, variable=ov,
-                          bg=BG_MAIN, fg=FG_TEXT, troughcolor=BG_BTN,
-                          highlightthickness=0, length=110,
-                          command=lambda v, k=cfg_key: tmp.update({k: float(v)}))
-            sc.grid(row=row, column=1, sticky='w', padx=4, pady=4)
+            tk.Scale(parent, from_=0.2, to=1.0, resolution=0.05,
+                     orient=tk.HORIZONTAL, variable=ov,
+                     bg=BG_MAIN, fg=FG_TEXT, troughcolor=BG_BTN,
+                     highlightthickness=0, length=110,
+                     command=lambda v, k=cfg_key: tmp.update({k: float(v)})
+                     ).grid(row=row, column=1, sticky='w', padx=4, pady=3)
 
-        # ── Tab: Preview ──────────────────────────────────────────────
-        t_prev = tk.Frame(nb, bg=BG_MAIN)
-        nb.add(t_prev, text=f"  {self.t('ui_tab_preview')}  ")
-        f = _fr(t_prev)
-        _color_row(f, 0, 'ui_preview_fg',   'preview_fg')
-        _check_row(f, 1, 'ui_preview_bg_on','preview_bg_on')
-        _color_row(f, 2, 'ui_preview_bg',   'preview_bg')
+        # ── Tab 1: Main Window ─────────────────────────────────────────
+        t_main = tk.Frame(nb, bg=BG_MAIN)
+        nb.add(t_main, text=f"  {self.t('ui_tab_main')}  ")
+        f = _scf(t_main)
+        _sep(f,  0, 'ui_sec_preview')
+        _color_row(f,  1, 'ui_preview_fg',    'preview_fg')
+        _check_row(f,  2, 'ui_preview_bg_on', 'preview_bg_on')
+        _color_row(f,  3, 'ui_preview_bg',    'preview_bg')
+        _sep(f,  4, 'ui_sec_main_btn')
+        _color_row(f,  5, 'ui_btn_color',     'btn_color')
+        _check_row(f,  6, 'ui_btn_bg_on',     'btn_bg_on')
+        _check_row(f,  7, 'ui_show_hotkeys',  'show_hotkeys')
+        _spin_row (f,  8, 'ui_btn_size',      'btn_icon_size', 24, 80)
+        _spin_row (f,  9, 'ui_btn_spacing',   'btn_spacing',   0,  20)
 
-        # ── Tab: Float ────────────────────────────────────────────────
+        # ── Tab 2: Float Window ────────────────────────────────────────
         t_float = tk.Frame(nb, bg=BG_MAIN)
         nb.add(t_float, text=f"  {self.t('ui_tab_float')}  ")
-        f = _fr(t_float)
-        _check_row(f, 0, 'ui_float_bg_on',   'float_bg_on')
-        _color_row(f, 1, 'ui_float_bg',       'float_bg')
-        _spin_row (f, 2, 'ui_float_x',        'float_x',  0, 3840)
-        _spin_row (f, 3, 'ui_float_y',        'float_y',  0, 2160)
-        _opacity_row(f, 4, 'ui_float_opacity','float_opacity')
-        _check_row(f, 5, 'ui_show_float_sel', 'show_float_sel', True)
-        _spin_row (f, 6, 'ui_float_font_size','float_font_size', 7, 20)
-        _color_row(f, 7, 'ui_float_fg',       'float_fg')
-        tk.Label(f, text=self.t('ui_preview_note'),
+        f = _scf(t_float)
+        _sep(f,   0, 'ui_sec_float_appear')
+        _check_row(f,  1, 'ui_float_bg_on',        'float_bg_on')
+        _color_row(f,  2, 'ui_float_bg',            'float_bg')
+        _scale_row(f,  3, 'ui_float_opacity',       'float_opacity')
+        _spin_row (f,  4, 'ui_float_font_size',     'float_font_size', 7, 20)
+        _color_row(f,  5, 'ui_float_fg',            'float_fg')
+        _spin_row (f,  6, 'ui_float_width',         'float_width',  120, 600)
+        _spin_row (f,  7, 'ui_float_height',        'float_height', 120, 800)
+        _spin_row (f,  8, 'ui_float_x',             'float_x', 0, 3840)
+        _spin_row (f,  9, 'ui_float_y',             'float_y', 0, 2160)
+        _check_row(f, 10, 'ui_show_float_sel',      'show_float_sel')
+
+        # Float results mode — radio buttons
+        _lbl(f, 11, 'ui_float_results_mode')
+        mode_fr = tk.Frame(f, bg=BG_MAIN)
+        mode_fr.grid(row=11, column=1, sticky='w', padx=4, pady=3)
+        mode_var = tk.StringVar(value=tmp.get('float_results_mode', 'expand'))
+        for val, lkey in [('expand', 'ui_float_mode_expand'),
+                          ('scroll', 'ui_float_mode_scroll')]:
+            tk.Radiobutton(
+                mode_fr, text=self.t(lkey), variable=mode_var, value=val,
+                bg=BG_MAIN, fg=FG_TEXT, selectcolor=BG_BTN,
+                activebackground=BG_MAIN, font=FONT_MAIN,
+                command=lambda v=val: tmp.update({'float_results_mode': v})
+            ).pack(anchor='w')
+
+        _sep(f,  12, 'ui_sec_float_btn')
+        _color_row(f, 13, 'ui_float_btn_color', 'float_btn_color')
+        _check_row(f, 14, 'ui_float_btn_bg_on', 'float_btn_bg_on')
+        tk.Label(f, text=self.t('ui_float_note'),
                  bg=BG_MAIN, fg=FG_HINT, font=FONT_HINT
-                 ).grid(row=8, column=0, columnspan=2, pady=4)
+                 ).grid(row=15, column=0, columnspan=2, pady=6, padx=4)
 
-        # ── Tab: Buttons ──────────────────────────────────────────────
-        t_btn = tk.Frame(nb, bg=BG_MAIN)
-        nb.add(t_btn, text=f"  {self.t('ui_tab_buttons')}  ")
-        f = _fr(t_btn)
-        _color_row(f, 0, 'ui_btn_color',  'btn_color')
-        _check_row(f, 1, 'ui_btn_bg_on',  'btn_bg_on')
-        _check_row(f, 2, 'ui_show_hotkeys','show_hotkeys')
-        _spin_row (f, 3, 'ui_btn_size',   'btn_icon_size', 24, 80)
-        _spin_row (f, 4, 'ui_btn_spacing','btn_spacing', 0, 20)
-
-        # ── Tab: Results ──────────────────────────────────────────────
+        # ── Tab 3: Results Display ─────────────────────────────────────
         t_res = tk.Frame(nb, bg=BG_MAIN)
         nb.add(t_res, text=f"  {self.t('ui_tab_results')}  ")
-        f = _fr(t_res)
-        _spin_row (f, 0, 'ui_results_font_size',    'results_font_size', 7, 20)
-        _color_row(f, 1, 'ui_results_fg',            'results_fg')
-        _check_row(f, 2, 'ui_results_show_number',   'results_show_number', True)
-        _check_row(f, 3, 'ui_results_show_estimate', 'results_show_estimate', True)
+        f = _scf(t_res)
+        _spin_row (f, 0, 'ui_results_font_size',     'results_font_size', 7, 20)
+        _color_row(f, 1, 'ui_results_fg',             'results_fg')
+        _check_row(f, 2, 'ui_results_show_number',    'results_show_number', True)
+        _check_row(f, 3, 'ui_results_show_estimate',  'results_show_estimate', True)
 
-        tk.Label(f, text=self.t('ui_sort_order'),
-                 bg=BG_MAIN, fg=FG_TEXT, font=FONT_MAIN
-                 ).grid(row=4, column=0, sticky='w', padx=4, pady=4)
-        sort_labels2  = [self.t(f'sort_{o}') for o in SORT_ORDERS]
-        sort_var2     = tk.StringVar(
+        _lbl(f, 4, 'ui_sort_order')
+        sort_labels2 = [self.t(f'sort_{o}') for o in SORT_ORDERS]
+        sort_var2    = tk.StringVar(
             value=self.t(f'sort_{self.settings["sort_order"]}'))
         ttk.Combobox(f, textvariable=sort_var2, values=sort_labels2,
                      state='readonly', width=22, font=FONT_HINT
-                     ).grid(row=4, column=1, sticky='w', padx=4, pady=4)
+                     ).grid(row=4, column=1, sticky='w', padx=4, pady=3)
 
-        # ── Bottom buttons ────────────────────────────────────────────
+        # ── Bottom controls ────────────────────────────────────────────
         bot = tk.Frame(win, bg=BG_MAIN, pady=8)
         bot.pack(fill=tk.X, padx=12)
 
         def save_iface():
+            # Update float results mode from radio
+            tmp['float_results_mode'] = mode_var.get()
             self.settings["interface"].update(tmp)
+            # Sort order
             try:
                 idx2 = sort_labels2.index(sort_var2.get())
                 self.settings["sort_order"] = SORT_ORDERS[idx2]
@@ -956,34 +976,29 @@ class ArtaleTimerPlayer:
             except ValueError:
                 pass
             self._save_settings()
-            self._rebuild_time_buttons()
+            # ⑦ Update buttons in-place — no rebuild
+            self._update_time_btn_styles()
             self._update_preview()
-            # Refresh result tags and text
-            self._configure_result_tags(tmp.get("results_fg", FG_RESULT))
+            self._configure_result_tags()
             rfs = tmp.get("results_font_size", 9)
+            rfg = tmp.get("results_fg", FG_RESULT)
             self.results_text.config(
-                font=("Consolas", rfs),
-                fg=tmp.get("results_fg", FG_RESULT))
+                font=("Consolas", rfs), fg=rfg)
             self._update_results()
-            messagebox.showinfo(self.t('ui_title'), self.t('ui_saved_msg'), parent=win)
+            messagebox.showinfo(self.t('ui_title'),
+                                self.t('ui_saved_msg'), parent=win)
 
         def reset_iface():
             nonlocal tmp
             tmp = copy.deepcopy(DEFAULT_SETTINGS["interface"])
 
-        self._bot_buttons(bot,
-            (self.t('ui_save'),  save_iface, FG_ACCENT, '#000'),
+        self._bot_btns(bot,
+            (self.t('ui_save'),  save_iface,  FG_ACCENT, '#000'),
             (self.t('ui_reset'), reset_iface, BG_BTN, FG_TEXT),
-            (self.t('ui_close'), lambda: self._close_sub(win, '_iface_win'), BG_BTN, FG_TEXT),
+            (self.t('ui_close'),
+             lambda: self._close_sub(win, '_iface_win'), BG_BTN, FG_TEXT),
         )
-        self._center_window(win)
-
-    def _rebuild_time_buttons(self):
-        for w in list(self.time_btn_widgets.values()):
-            try: w.destroy()
-            except Exception: pass
-        self.time_btn_widgets.clear()
-        self._build_time_buttons_frame()
+        self._center_win(win)
 
     # ══════════════════════════════════════════════════════════════════════
     # Sponsor window
@@ -1013,10 +1028,10 @@ class ArtaleTimerPlayer:
             bg=BG_BTN, fg=FG_TEXT, relief=tk.FLAT,
             padx=12, pady=4, font=FONT_MAIN, cursor='hand2',
         ).pack(pady=(10, 0))
-        self._center_window(win)
+        self._center_win(win)
 
     # ══════════════════════════════════════════════════════════════════════
-    # Floating window
+    # Floating window  (① resizable, ⑤ expand/scroll mode)
     # ══════════════════════════════════════════════════════════════════════
 
     def _toggle_float(self):
@@ -1026,12 +1041,19 @@ class ArtaleTimerPlayer:
             self._open_float()
 
     def _open_float(self):
-        iface  = self.settings["interface"]
-        bg     = iface["float_bg"] if iface["float_bg_on"] else BG_MAIN
-        gap    = iface["btn_spacing"]
-        f_size = iface.get("float_font_size", 8)
-        f_fg   = iface.get("float_fg", FG_RESULT)
-        show_sel = iface.get("show_float_sel", True)
+        iface      = self.settings["interface"]
+        bg         = iface["float_bg"] if iface["float_bg_on"] else BG_MAIN
+        gap        = iface["btn_spacing"]
+        f_size     = iface.get("float_font_size", 8)
+        f_fg       = iface.get("float_fg", FG_RESULT)
+        show_sel   = iface.get("show_float_sel", True)
+        res_mode   = iface.get("float_results_mode", "expand")
+        fw         = iface.get("float_width",  240)
+        fh         = iface.get("float_height", 390)
+        fx         = iface.get("float_x", 100)
+        fy         = iface.get("float_y", 100)
+        f_btn_color= iface.get("float_btn_color", "#5bb8f5")
+        f_btn_bg   = BG_BTN if iface.get("float_btn_bg_on", True) else bg
 
         win = tk.Toplevel(self.root)
         self._float_win = win
@@ -1039,18 +1061,19 @@ class ArtaleTimerPlayer:
         win.attributes('-topmost', True)
         win.attributes('-alpha', iface["float_opacity"])
         win.configure(bg=bg)
-        win.geometry(f"+{iface.get('float_x', 100)}+{iface.get('float_y', 100)}")
+        # ① set initial size
+        win.geometry(f"{fw}x{fh}+{fx}+{fy}")
 
-        # ── Icon row (drag + gear + close) ────────────────────────────
+        # ── Icon row ──────────────────────────────────────────────────
         icon_row = tk.Frame(win, bg=bg)
         icon_row.pack(fill=tk.X, padx=2, pady=(2, 0))
 
-        icon_sz = 20
-        move_path = os.path.join(PNG_DIR, "Set_Arrow_keys.png")
-        gear_path = os.path.join(PNG_DIR, "Set_gear.png")
+        isz      = 20
+        mv_path  = os.path.join(PNG_DIR, "Set_Arrow_keys.png")
+        gr_path  = os.path.join(PNG_DIR, "Set_gear.png")
 
-        if PIL_AVAILABLE and os.path.exists(move_path):
-            img = Image.open(move_path).resize((icon_sz, icon_sz), Image.LANCZOS)
+        if PIL_AVAILABLE and os.path.exists(mv_path):
+            img = Image.open(mv_path).resize((isz, isz), Image.LANCZOS)
             self._img_move = ImageTk.PhotoImage(img)
             move_lbl = tk.Label(icon_row, image=self._img_move, bg=bg, cursor='fleur')
         else:
@@ -1060,8 +1083,8 @@ class ArtaleTimerPlayer:
         move_lbl.bind('<ButtonPress-1>', self._float_drag_start)
         move_lbl.bind('<B1-Motion>',     self._float_drag_move)
 
-        if PIL_AVAILABLE and os.path.exists(gear_path):
-            img2 = Image.open(gear_path).resize((icon_sz, icon_sz), Image.LANCZOS)
+        if PIL_AVAILABLE and os.path.exists(gr_path):
+            img2 = Image.open(gr_path).resize((isz, isz), Image.LANCZOS)
             self._img_gear = ImageTk.PhotoImage(img2)
             gear_lbl = tk.Label(icon_row, image=self._img_gear, bg=bg, cursor='hand2')
         else:
@@ -1082,8 +1105,7 @@ class ArtaleTimerPlayer:
         prev_row.pack(fill=tk.X, padx=2, pady=(0, 1))
         self._float_slots: list[tk.Label] = []
         for i in range(4):
-            txt = (self.selected[i] if i < len(self.selected)
-                   else self.t('preview_empty'))
+            txt   = self.selected[i] if i < len(self.selected) else self.t('preview_empty')
             fg_now = slot_fg if i < len(self.selected) else FG_MUTED
             lbl = tk.Label(prev_row, text=txt, width=5, bg=slot_bg,
                            fg=fg_now, font=(FONT_FAMILY, f_size, "bold"),
@@ -1092,19 +1114,18 @@ class ArtaleTimerPlayer:
             lbl.bind('<Button-1>', lambda e, idx=i: self._on_preview_click(idx))
             self._float_slots.append(lbl)
 
-        # ── Time buttons 4×2 (shown only if show_float_sel) ──────────
+        # ── Time buttons 4×2 (optional) ───────────────────────────────
         if show_sel:
             btn_row = tk.Frame(win, bg=bg)
             btn_row.pack(padx=2, pady=(1, 1))
-            btn_fg  = iface["btn_color"]
-            btn_bg2 = BG_BTN if iface["btn_bg_on"] else bg
             self._float_btns: dict[str, tk.Button] = {}
             for idx, (label_key, name) in enumerate(TIME_BUTTONS):
                 b = tk.Button(
                     btn_row, text=self.t(label_key), width=5,
-                    bg=btn_bg2, fg=btn_fg,
+                    bg=f_btn_bg, fg=f_btn_color,
                     activebackground=BG_BTN_HV, activeforeground=FG_TEXT,
-                    relief=tk.FLAT, font=(FONT_FAMILY, f_size, "bold"),
+                    relief=tk.FLAT,
+                    font=(FONT_FAMILY, f_size, "bold"),
                     cursor='hand2',
                     command=lambda n=name: self._on_time_btn(n))
                 b.grid(row=idx // 4, column=idx % 4,
@@ -1117,30 +1138,49 @@ class ArtaleTimerPlayer:
         sep = tk.Frame(win, bg=BORDER, height=1)
         sep.pack(fill=tk.X, padx=4, pady=(2, 0))
 
-        res_frame = tk.Frame(win, bg=bg)
-        res_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=(0, 2))
+        if res_mode == 'scroll':
+            # Current scroll mode
+            res_frame = tk.Frame(win, bg=bg)
+            res_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=(0, 2))
+            res_sb = tk.Scrollbar(res_frame, orient=tk.VERTICAL,
+                                  bg=BG_CARD, width=8)
+            res_sb.pack(side=tk.RIGHT, fill=tk.Y)
+            self._float_res_txt = tk.Text(
+                res_frame, bg=bg, fg=f_fg,
+                font=("Consolas", f_size),
+                relief=tk.FLAT, bd=0,
+                state=tk.DISABLED, wrap=tk.NONE,
+                yscrollcommand=res_sb.set,
+                height=7, width=34, padx=4, pady=2)
+            self._float_res_txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            res_sb.config(command=self._float_res_txt.yview)
+        else:
+            # Expand mode — auto-height, no scrollbar
+            self._float_res_txt = tk.Text(
+                win, bg=bg, fg=f_fg,
+                font=("Consolas", f_size),
+                relief=tk.FLAT, bd=0,
+                state=tk.DISABLED, wrap=tk.NONE,
+                padx=4, pady=2)
+            self._float_res_txt.pack(fill=tk.X, padx=2, pady=(0, 2))
 
-        res_sb = tk.Scrollbar(res_frame, orient=tk.VERTICAL, bg=BG_CARD, width=8)
-        res_sb.pack(side=tk.RIGHT, fill=tk.Y)
+        # Common tags for results text
+        for _txt in (self._float_res_txt,):
+            _txt.tag_configure('header',       foreground=FG_RESULT_H)
+            _txt.tag_configure('col_num',      foreground=FG_HINT)
+            _txt.tag_configure('col_range',    foreground=FG_TEXT)
+            _txt.tag_configure('col_action',   foreground=FG_WHITE)
+            _txt.tag_configure('col_estimate', foreground=f_fg)
+            _txt.tag_configure('muted',        foreground=FG_MUTED)
+            _txt.tag_configure('newline',      foreground=f_fg)
 
-        self._float_res_txt = tk.Text(
-            res_frame, bg=bg, fg=f_fg,
-            font=("Consolas", f_size),
-            relief=tk.FLAT, bd=0,
-            state=tk.DISABLED, wrap=tk.NONE,
-            yscrollcommand=res_sb.set,
-            height=7, width=34,
-            padx=4, pady=2)
-        self._float_res_txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        res_sb.config(command=self._float_res_txt.yview)
-
-        self._float_res_txt.tag_configure('header',      foreground=FG_RESULT_H)
-        self._float_res_txt.tag_configure('col_num',     foreground=FG_HINT)
-        self._float_res_txt.tag_configure('col_range',   foreground=FG_TEXT)
-        self._float_res_txt.tag_configure('col_action',  foreground=FG_WHITE)
-        self._float_res_txt.tag_configure('col_estimate',foreground=f_fg)
-        self._float_res_txt.tag_configure('muted',       foreground=FG_MUTED)
-        self._float_res_txt.tag_configure('newline',     foreground=f_fg)
+        # ① Resize grip (bottom-right)
+        grip = tk.Label(win, text='◢', bg=bg, fg=FG_MUTED,
+                        font=("Arial", 8), cursor='size_nw_se')
+        grip.pack(side=tk.BOTTOM, anchor='se', padx=2, pady=1)
+        grip.bind('<ButtonPress-1>',  self._float_rsz_start)
+        grip.bind('<B1-Motion>',      self._float_rsz_drag)
+        grip.bind('<ButtonRelease-1>',self._float_rsz_end)
 
         self._float_update_results()
 
@@ -1149,6 +1189,8 @@ class ArtaleTimerPlayer:
             try:
                 self.settings["interface"]["float_x"] = self._float_win.winfo_x()
                 self.settings["interface"]["float_y"] = self._float_win.winfo_y()
+                self.settings["interface"]["float_width"]  = self._float_win.winfo_width()
+                self.settings["interface"]["float_height"] = self._float_win.winfo_height()
             except Exception:
                 pass
             self._float_win.destroy()
@@ -1162,6 +1204,25 @@ class ArtaleTimerPlayer:
         x = event.x_root - self._float_drag_x
         y = event.y_root - self._float_drag_y
         self._float_win.geometry(f'+{x}+{y}')
+
+    # ① Resize handlers
+    def _float_rsz_start(self, event):
+        self._float_rsz_x = event.x_root
+        self._float_rsz_y = event.y_root
+        self._float_rsz_w = self._float_win.winfo_width()
+        self._float_rsz_h = self._float_win.winfo_height()
+
+    def _float_rsz_drag(self, event):
+        dx  = event.x_root - self._float_rsz_x
+        dy  = event.y_root - self._float_rsz_y
+        new_w = max(160, self._float_rsz_w + dx)
+        new_h = max(120, self._float_rsz_h + dy)
+        self._float_win.geometry(f'{int(new_w)}x{int(new_h)}')
+
+    def _float_rsz_end(self, event):
+        if self._float_win and self._float_win.winfo_exists():
+            self.settings["interface"]["float_width"]  = self._float_win.winfo_width()
+            self.settings["interface"]["float_height"] = self._float_win.winfo_height()
 
     def _float_gear_click(self):
         self.root.deiconify()
@@ -1186,28 +1247,38 @@ class ArtaleTimerPlayer:
             return
         if not hasattr(self, '_float_res_txt'):
             return
+
         iface        = self.settings["interface"]
         show_number  = iface.get("results_show_number",   True)
         show_estimate= iface.get("results_show_estimate", True)
+        res_mode     = iface.get("float_results_mode", "expand")
+
         txt = self._float_res_txt
         txt.config(state=tk.NORMAL)
         txt.delete('1.0', tk.END)
+
         if not self.selected:
             txt.insert(tk.END, self.t('results_empty'), 'muted')
         else:
-            order  = self.settings["sort_order"]
             tagged = compute_tagged_results(
-                self.selected, order, self.lang, show_number, show_estimate)
+                self.selected, self.settings["sort_order"],
+                self.lang, show_number, show_estimate)
             for text_part, tag in tagged:
                 txt.insert(tk.END, text_part, tag)
+
+        # ⑤ Expand mode: auto-fit height
+        if res_mode == 'expand':
+            content = txt.get('1.0', tk.END)
+            n_lines = max(2, content.count('\n'))
+            txt.config(height=n_lines)
+
         txt.config(state=tk.DISABLED)
 
     # ══════════════════════════════════════════════════════════════════════
     # Utilities
     # ══════════════════════════════════════════════════════════════════════
 
-    def _bot_buttons(self, parent, *spec):
-        """Add a row of (label, command, bg, fg) buttons."""
+    def _bot_btns(self, parent, *spec):
         for label, cmd, bg, fg in spec:
             tk.Button(parent, text=label, command=cmd,
                       bg=bg, fg=fg, relief=tk.FLAT, font=FONT_BTN,
@@ -1215,18 +1286,18 @@ class ArtaleTimerPlayer:
                       ).pack(side=tk.LEFT, padx=4)
 
     def _close_sub(self, win, attr: str):
-        try: win.destroy()
+        try:   win.destroy()
         except Exception: pass
         setattr(self, attr, None)
         self._update_hint()
 
-    def _center_window(self, win: tk.Toplevel):
+    def _center_win(self, win: tk.Toplevel):
         win.update_idletasks()
         w, h = win.winfo_reqwidth(), win.winfo_reqheight()
         sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         win.geometry(f"+{(sw-w)//2}+{(sh-h)//2}")
 
-    def _set_icon(self, win: tk.Toplevel):
+    def _set_icon(self, win):
         if os.path.exists(ICON_PATH):
             try: win.iconbitmap(ICON_PATH)
             except Exception: pass
